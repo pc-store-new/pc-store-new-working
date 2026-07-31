@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Оформление заказа — NODE.PC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container bar">
+    <a href="/" class="logo"><span class="dot"></span>NODE.PC</a>
+    <nav class="nav">
+      <a href="/">Готовые сборки</a>
+      <a href="/catalog.html">Каталог</a>
+      <a href="/builder.html">Конструктор сборки</a>
+    </nav>
+    <a href="/cart.html" class="cart-link">
+      Корзина <span id="cart-count" class="cart-badge" style="display:none">0</span>
+    </a>
+  </div>
+</header>
+
+<section class="section">
+  <div class="container" style="max-width:760px">
+    <div class="section-head"><h2>Оформление заказа</h2></div>
+
+    <div id="summary" style="margin-bottom:24px;font-size:14px;color:var(--text-dim)"></div>
+
+    <form class="checkout-form" id="checkout-form">
+      <div>
+        <label for="name">Имя и фамилия</label>
+        <input id="name" name="name" required>
+      </div>
+      <div>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required>
+      </div>
+      <div>
+        <label for="phone">Телефон</label>
+        <input id="phone" name="phone" type="tel">
+      </div>
+      <div>
+        <label for="address">Адрес доставки</label>
+        <textarea id="address" name="address" rows="3" required></textarea>
+      </div>
+      <div id="form-error" class="issue error" style="display:none"></div>
+      <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Оплатить и оформить</button>
+      <p style="font-size:12px;color:var(--text-dim)">
+        Это демо-магазин: если у продавца не подключён Stripe, заказ подтверждается сразу без реального списания средств.
+      </p>
+    </form>
+  </div>
+</section>
+
+<footer class="footer">
+<img class="decor cable" src="img/decor/cable.svg" alt="">
+<img class="decor mouse" src="img/decor/mouse.svg" alt="">
+
+  <div class="container">NODE.PC — демонстрационный проект интернет-магазина. Все цены и наличие условны.</div>
+</footer>
+
+<script src="js/api.js"></script>
+<script>
+let selection = null;
+try {
+  selection = JSON.parse(localStorage.getItem("nodepc_checkout_selection") || "null");
+} catch (e) {
+  selection = null;
+}
+const hasSelection = selection && ((selection.productIds && selection.productIds.length) || (selection.groupIds && selection.groupIds.length));
+
+(async function () {
+  const cart = await API.getCart();
+  const summary = document.getElementById("summary");
+
+  if (!cart.groups.length && !cart.individual.length) {
+    summary.innerHTML = "Корзина пуста — <a href='/' style='color:var(--accent)'>вернуться в каталог</a>.";
+    document.getElementById("checkout-form").style.display = "none";
+    return;
+  }
+
+  // Если пришли из корзины с выбором — оформляем только отмеченное.
+  // Если открыли страницу напрямую (выбора нет) — оформляем всё, что в корзине.
+  const groups = hasSelection ? cart.groups.filter((g) => selection.groupIds.includes(g.groupId)) : cart.groups;
+  const individual = hasSelection ? cart.individual.filter((i) => selection.productIds.includes(i.productId)) : cart.individual;
+
+  if (!groups.length && !individual.length) {
+    summary.innerHTML = "Ничего не выбрано для оформления — <a href='/cart.html' style='color:var(--accent)'>вернуться в корзину</a>.";
+    document.getElementById("checkout-form").style.display = "none";
+    return;
+  }
+
+  const positionsCount = groups.reduce((n, g) => n + g.items.length, 0) + individual.length;
+  const total = groups.reduce((s, g) => s + g.subtotal, 0) + individual.reduce((s, i) => s + i.subtotal, 0);
+
+  const lines = [
+    ...groups.map((g) => `🖥 ${g.groupLabel} — ${money(g.subtotal)}`),
+    ...individual.map((i) => `${i.product.name} × ${i.qty} — ${money(i.subtotal)}`),
+  ];
+
+  summary.innerHTML = `
+    <div style="margin-bottom:10px">${positionsCount} позиций в заказе · Итого: <strong style="color:var(--text)">${money(total)}</strong></div>
+    <ul style="margin:0;padding-left:18px;line-height:1.7">${lines.map((l) => `<li>${l}</li>`).join("")}</ul>
+  `;
+})();
+
+document.getElementById("checkout-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("submit-btn");
+  const errBox = document.getElementById("form-error");
+  errBox.style.display = "none";
+  btn.disabled = true;
+  btn.textContent = "Обрабатываем…";
+
+  const customer = {
+    name: document.getElementById("name").value,
+    email: document.getElementById("email").value,
+    phone: document.getElementById("phone").value,
+    address: document.getElementById("address").value,
+  };
+
+  try {
+    const result = await API.checkout(customer, hasSelection ? selection : null);
+    if (result.error) {
+      errBox.textContent = result.error;
+      errBox.style.display = "flex";
+      btn.disabled = false;
+      btn.textContent = "Оплатить и оформить";
+      return;
+    }
+    localStorage.removeItem("nodepc_checkout_selection");
+    if (result.mode === "stripe" && result.checkoutUrl) {
+      window.location.href = result.checkoutUrl; // редирект на реальную оплату Stripe
+    } else {
+      window.location.href = `/success.html?order=${result.orderId}`;
+    }
+  } catch (err) {
+    errBox.textContent = "Не удалось оформить заказ. Попробуйте ещё раз.";
+    errBox.style.display = "flex";
+    btn.disabled = false;
+    btn.textContent = "Оплатить и оформить";
+  }
+});
+</script>
+</body>
+</html>

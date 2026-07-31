@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Готовые сборки ПК — NODE.PC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container bar">
+    <a href="/" class="logo"><span class="dot"></span>NODE.PC</a>
+    <nav class="nav">
+      <a href="/" class="active">Готовые сборки</a>
+      <a href="/catalog.html">Каталог</a>
+      <a href="/builder.html">Конструктор сборки</a>
+    </nav>
+    <a href="/cart.html" class="cart-link">
+      Корзина <span id="cart-count" class="cart-badge" style="display:none">0</span>
+    </a>
+  </div>
+</header>
+
+<section class="hero" style="padding-bottom:32px">
+<img class="decor mug" src="img/decor/mug.svg" alt="">
+<img class="decor laptop" src="img/decor/laptop.svg" alt="">
+
+  <div class="container">
+    <div class="eyebrow">// готовые сборки</div>
+    <h1>Не хотите собирать сами — выберите готовое решение.</h1>
+    <p>Готовые сборки на AMD и Intel — от бюджетных до топовых, все проверены на совместимость. У каждой — характеристики, цена и отзывы. Хотите собрать своё — переходите в <a href="/builder.html" style="color:var(--accent-dark)">конструктор</a>.</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="container">
+    <div class="section-head">
+      <h2>Сборки на AMD</h2>
+      <span class="count" id="amd-count"></span>
+    </div>
+    <div class="grid" id="amd-grid"></div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="container">
+    <div class="section-head">
+      <h2>Сборки на Intel</h2>
+      <span class="count" id="intel-count"></span>
+    </div>
+    <div class="grid" id="intel-grid"></div>
+  </div>
+</section>
+
+<footer class="footer">
+<img class="decor cable" src="img/decor/cable.svg" alt="">
+<img class="decor mouse" src="img/decor/mouse.svg" alt="">
+  <div class="container">NODE.PC — демонстрационный проект интернет-магазина. Все цены и наличие условны.</div>
+</footer>
+
+<script src="js/api.js"></script>
+<script>
+const TIER_LABELS = { budget: "Стартовая", mid: "Оптимальная", high: "Производительная", flagship: "Флагманская" };
+
+function buildCard(b) {
+  return `
+    <a href="build.html?id=${b.id}" class="card" style="cursor:pointer">
+      <div class="thumb"><img src="${imgSrc(b.image)}" alt="${b.name}" loading="lazy"></div>
+      <div class="brand">${TIER_LABELS[b.tier] || ""}</div>
+      <div class="name">${b.name}</div>
+      <div class="desc">${b.description}</div>
+      <div class="price-row"><span class="price">${money(b.price)}</span></div>
+    </a>
+  `;
+}
+
+async function init() {
+  const [amd, intel] = await Promise.all([API.getBuilds("amd"), API.getBuilds("intel")]);
+
+  document.getElementById("amd-count").textContent = `${amd.length} сборок`;
+  document.getElementById("amd-grid").innerHTML = amd.map(buildCard).join("");
+
+  document.getElementById("intel-count").textContent = `${intel.length} сборок`;
+  document.getElementById("intel-grid").innerHTML = intel.map(buildCard).join("");
+}
+
+init();
+</script>
+</body>
+</html>
